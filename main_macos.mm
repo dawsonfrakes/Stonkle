@@ -30,7 +30,11 @@ extern "C" [[noreturn]] void start() {
     defer:NO];
   [window setDelegate:[StonkleWindowDelegate new]];
   [window setTitle:@"Stonkle"];
+  [window setAcceptsMouseMovedEvents:YES];
   [window makeKeyAndOrderFront:nil];
+
+  NSWindowController* controller = [[NSWindowController alloc] initWithWindow:window];
+  [controller setWindowFrameAutosaveName:@"position"];
 
   NSMenu* menubar = [NSMenu new];
   [NSApp setMenu:menubar];
@@ -66,6 +70,8 @@ extern "C" [[noreturn]] void start() {
       }
       [ev release];
     }
+
+    [[window contentView] setNeedsDisplay:YES];
   }
 
   [NSApp terminate:nil];
