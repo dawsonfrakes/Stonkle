@@ -1,3 +1,8 @@
+<!--
+  TODO:
+    Use country flags instead of input:text for locale
+    Alpaca account info page, hide connection page
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,139 +14,141 @@
   <link rel="shortcut icon" href="/favicon/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
   <link rel="manifest" href="/favicon/site.webmanifest" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    html, body {
+      height: 100%;
+      font-family: sans-serif;
+      font-weight: 100;
+    }
+    body {
+      color: #FFFFFF;
+      background-color: #333333;
+    }
+    .centered {
+      display: flex;
+      justify-content: center;
+    }
+  </style>
 </head>
 <body>
-  <script type="text/babel" data-presets="typescript,react">
-    const useState = React.useState;
-    const useRef = React.useRef;
-    const useEffect = React.useEffect;
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" data-type="module" data-presets="typescript,react,flow">
+   import React from "https://esm.sh/react?dev";
+    import ReactDOM from "https://esm.sh/react-dom/client?dev";
+    const { useState, useRef, useEffect } = React;
+
+    const TRANSLATIONS = {
+      "en": {
+        "title": "Stonkla",
+        "connect": "Connect",
+        "disconnect": "Disconnect",
+        "api-key": "API Key",
+        "api-secret": "API Secret",
+        "locale": "Locale",
+        "current-locale": flag => `Locale: ${flag}`,
+        "flag": "🇺🇸",
+        "account-buying-power": amount => `Buying Power: ${amount}`,
+        "currency": "USD",
+      },
+      "fr": {
+        "title": "Stonkla",
+        "connect": "Connecter",
+        "disconnect": "Déconnecter",
+        "api-key": "Clé API",
+        "api-secret": "API secrète",
+        "locale": "Lieu",
+        "current-locale": flag => `Lieu: ${flag}`,
+        "flag": "🇫🇷",
+        "account-buying-power": amount => `Pouvoir d'achat: ${amount}`,
+        "currency": "EUR",
+      },
+    };
 
     const ConnectionState = {
       DISCONNECTED: 0,
       FAILED: 1,
       CONNECTING: 2,
       CONNECTED: 3,
-    }
+    };
 
-    function Login({ connection, setConnection }) {
-      let [apiKey, setApiKey] = useState("");
-      let [apiSecret, setApiSecret] = useState("");
-      let [alpacaAccount, setAlpacaAccount] = useState(null);
-      let [usePaper, setUsePaper] = useState(false);
-
-      function handleClick() {
-        if (connection <= ConnectionState.FAILED) {
-          async function connectToAlpaca() {
-            setConnection(ConnectionState.CONNECTING);
-
-            const options = {
-              method: 'GET',
-              headers: {
-                accept: 'application/json',
-                'APCA-API-KEY-ID': apiKey,
-                'APCA-API-SECRET-KEY': apiSecret,
-              }
-            };
-            await fetch(`https://${usePaper ? "paper-api" : "api"}.alpaca.markets/v2/account`, options)
-              .then(res => {
-                if (res.status !== 200) throw new Error(res.statusMessage);
-                return res.json();
-              })
-              .then(res => {
-                setConnection(ConnectionState.CONNECTED);
-                setAlpacaAccount(res);
-              })
-              .catch(err => {
-                setConnection(ConnectionState.FAILED);
-                console.error(err);
-              });
-          }
-          connectToAlpaca();
-        } else if (connection === ConnectionState.CONNECTED) {
-          setAlpacaAccount(null);
-          setConnection(ConnectionState.DISCONNECTED);
-        }
-      }
-
+    function Locale({ T, locale, setLocale }) {
       return (
-        <div>
-          <h2>Alpaca{connection !== ConnectionState.CONNECTED && " Login"}</h2>
-          {connection !== ConnectionState.CONNECTED &&
-            <>
-              <input type="text" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)}/>
-              {' '}
-              <input type="password" placeholder="API Secret" value={apiSecret} onChange={e => setApiSecret(e.target.value)} />
-              {' '}
-              <label>
-                <input type="checkbox" checked={usePaper} onChange={e => setUsePaper(e.target.checked)} />
-                {' '} Paper Account
-              </label>
-              {' '}
-            </>}
-          <button onClick={handleClick} disabled={connection === ConnectionState.CONNECTING}>
-            {connection !== ConnectionState.CONNECTED ? "Connect" : "Disconnect"}
-          </button>
-          <span style={{color: "red"}} hidden={connection !== ConnectionState.FAILED}> Failed to connect to Alpaca.</span>
-          {alpacaAccount &&
-            <div>
-              <span>Account: {alpacaAccount.account_number}</span>
-              <br />
-              <span>Status: {alpacaAccount.status}</span>
-              <br />
-              <span>Cash: {alpacaAccount.cash} {alpacaAccount.currency}</span>
-              <br />
-              <span>Buying Power: {alpacaAccount.buying_power} {alpacaAccount.currency}</span>
-            </div>}
+        <div className="centered">
+          <span onClick={e => setLocale("en")}>{TRANSLATIONS["en"]["flag"]}</span>
+          <span onClick={e => setLocale("fr")}>{TRANSLATIONS["fr"]["flag"]}</span>
+          {T("current-locale")(T("flag"))}
         </div>
       );
     }
 
-    function Chart() {
-      const chartContainerRef = useRef(null);
+    function AlpacaConnection({ T, locale, connection, setConnection }) {
+      const [apiKey, setApiKey] = useState(localStorage.getItem("api-key") || "");
+      const [apiSecret, setApiSecret] = useState("");
 
-      useEffect(() => {
-        const chart = LightweightCharts.createChart(chartContainerRef.current, { width: 800, height: 400, });
-        const candlestickSeries = chart.addCandlestickSeries({
-          upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-          wickUpColor: '#26a69a', wickDownColor: '#ef5350',
-        });
-        candlestickSeries.setData([
-          { time: '2018-12-22', open: 75.16, high: 82.84, low: 36.16, close: 45.72 },
-          { time: '2018-12-23', open: 45.12, high: 53.90, low: 45.12, close: 48.09 },
-          { time: '2018-12-24', open: 60.71, high: 60.71, low: 53.39, close: 59.29 },
-          { time: '2018-12-25', open: 68.26, high: 68.26, low: 59.04, close: 60.50 },
-          { time: '2018-12-26', open: 67.71, high: 105.85, low: 66.67, close: 91.04 },
-          { time: '2018-12-27', open: 91.04, high: 121.40, low: 82.70, close: 111.40 },
-          { time: '2018-12-28', open: 111.51, high: 142.83, low: 103.34, close: 131.25 },
-          { time: '2018-12-29', open: 131.33, high: 151.17, low: 77.68, close: 96.43 },
-          { time: '2018-12-30', open: 106.33, high: 110.20, low: 90.39, close: 98.10 },
-          { time: '2018-12-31', open: 109.87, high: 114.69, low: 85.66, close: 111.26 },
-        ]);
-        chart.timeScale().fitContent();
-        return () => {
-          chart.remove();
-        };
-      }, []);
+      useEffect(() => localStorage.setItem("api-key", apiKey), [apiKey]);
 
-      return (<div ref={chartContainerRef}></div>);
+      function handleConnect(e) {
+        e.preventDefault();
+        if (e.target.parentNode.reportValidity()) {
+          if (connection <= ConnectionState.FAILED) {
+            setConnection(ConnectionState.CONNECTED);
+          }
+        }
+      }
+
+      function handleDisconnect() {
+        console.assert(connection === ConnectionState.CONNECTED);
+        setConnection(ConnectionState.DISCONNECTED);
+      }
+
+      return (
+        <div className="centered">
+          {connection !== ConnectionState.CONNECTED ?
+            <form>
+              <label>
+                {T("api-key")}
+                <input type="text" required placeholder={T("api-key")} value={apiKey} onChange={e => setApiKey(e.target.value)} />
+              </label>
+              <label>
+                {T("api-secret")}
+                <input type="password" required placeholder={T("api-secret")} value={apiSecret} onChange={e => setApiSecret(e.target.value)} />
+              </label>
+              <button onClick={handleConnect}>{T("connect")}</button>
+            </form> :
+            <button onClick={handleDisconnect}>{T("disconnect")}</button>
+          }
+        </div>
+      );
+    }
+
+    function AlpacaAccount({ T, locale, connection }) {
+      const C = amount => new Intl.NumberFormat(locale, { style: "currency", currency: T("currency") }).format(amount);
+      return (
+        <div className="centered">
+          {T("account-buying-power")(C(100.28))}
+        </div>
+      );
     }
 
     function App() {
-      let [connection, setConnection] = useState(ConnectionState.DISCONNECTED);
+      const [locale, setLocale] = useState(localStorage.getItem("locale") || navigator.language.slice(0, 2));
+      const [connection, setConnection] = useState(ConnectionState.DISCONNECTED);
+
+      const T = key => TRANSLATIONS[locale][key];
+
+      useEffect(() => localStorage.setItem("locale", locale), [locale]);
 
       return (
         <>
-          <Login connection={connection} setConnection={setConnection} />
-          {connection === ConnectionState.CONNECTED && <Chart />}
+          <title>{T("title")}</title>
+          <Locale T={T} locale={locale} setLocale={setLocale} />
+          <AlpacaConnection T={T} locale={locale} connection={connection} setConnection={setConnection} />
+          {connection === ConnectionState.CONNECTED && <AlpacaAccount T={T} locale={locale} connection={connection} />}
         </>
       );
     }
 
-    ReactDOM.createRoot(document.body).render(<App />);
+    ReactDOM.createRoot(document.body).render(<App />)
   </script>
 </body>
 </html>
