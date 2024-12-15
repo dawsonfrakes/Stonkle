@@ -37,7 +37,9 @@
         "alpaca-api-secret-placeholder": "API Secret",
         "alpaca-api-connect-button": "Connect",
         "alpaca-api-disconnect-button": "Disconnect",
+        "alpaca-account-number-label": "Account Number:",
         "alpaca-buying-power-label": "Buying Power:",
+        "alpaca-cash-label": "Cash:",
         "dark-mode-label": "Dark",
         "light-mode-label": "Light",
         "default-currency": "USD",
@@ -50,7 +52,9 @@
         "alpaca-api-secret-placeholder": "API secrète",
         "alpaca-api-connect-button": "Connecter",
         "alpaca-api-disconnect-button": "Déconnecter",
+        "alpaca-account-number-label": "Numéro de compte:",
         "alpaca-buying-power-label": "Pouvoir d'achat:",
+        "alpaca-cash-label": "Espèces:",
         "dark-mode-label": "Sombre",
         "light-mode-label": "Lumière",
         "default-currency": "EUR",
@@ -94,19 +98,46 @@
     );
   }
 
-  function AlpacaLogin({ T, alpacaConnection, setAlpacaConnection }) {
+  function AlpacaLogin({ T, alpacaConnection, setAlpacaConnection, setAlpacaAccount }) {
     const [alpacaApiKey, setAlpacaApiKey] = useState(localStorage.getItem("alpaca-api-key") ?? "");
+    const [alpacaApiSecret, setAlpacaApiSecret] = useState("");
 
     useEffect(() => localStorage.setItem("alpaca-api-key", alpacaApiKey), [alpacaApiKey]);
 
     function handleConnect(e) {
       e.preventDefault();
       setAlpacaConnection("CONNECTING");
-      setAlpacaConnection("CONNECTED");
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'APCA-API-KEY-ID': alpacaApiKey,
+          'APCA-API-SECRET-KEY': alpacaApiSecret,
+        }
+      };
+      fetch("https://paper-api.alpaca.markets/v2/account", options)
+        .then(res => {
+          if (res.status !== 200) throw new Error(res.statusText);
+          return res.json()
+        })
+        .then(res => {
+          if (res.status === "ACTIVE") {
+            setAlpacaConnection("CONNECTED");
+            setAlpacaAccount(res);
+          } else {
+            throw new Error(res.status);
+          }
+        })
+        .catch(err => {
+          setAlpacaConnection("FAILED");
+          setAlpacaAccount(null);
+          console.error(err);
+        });
     }
 
     function handleDisconnect() {
       setAlpacaConnection("DISCONNECTED");
+      setAlpacaAccount(null);
     }
 
     return alpacaConnection !== "CONNECTED" ? (
@@ -117,9 +148,10 @@
         </label>
         <label>
           {T("alpaca-api-secret-label")}
-          <input type="password" placeholder={T("alpaca-api-secret-placeholder")} required />
+          <input type="password" placeholder={T("alpaca-api-secret-placeholder")} value={alpacaApiSecret} onChange={e => setAlpacaApiSecret(e.target.value)} required />
         </label>
-        <button disabled={alpacaConnection !== "DISCONNECTED"}>{T("alpaca-api-connect-button")}</button>
+        <button disabled={alpacaConnection === "CONNECTING"}>{T("alpaca-api-connect-button")}</button>
+        <span style={{color: "red"}} hidden={alpacaConnection !== "FAILED"}> Failed to connect to Alpaca.</span>
       </form>
     ) : (
       <div>
@@ -128,10 +160,12 @@
     );
   }
 
-  function AlpacaAccount({ T, C }) {
+  function AlpacaAccount({ T, C, alpacaAccount }) {
     return (
       <div>
-      {T("alpaca-buying-power-label") + " " + C(100.00)}
+        <p>{T("alpaca-account-number-label") + " " + alpacaAccount.account_number}</p>
+        <p>{T("alpaca-buying-power-label") + " " + C(alpacaAccount.buying_power)}</p>
+        <p>{T("alpaca-cash-label") + " " + C(alpacaAccount.cash)}</p>
       </div>
     );
   }
@@ -139,7 +173,9 @@
   function App() {
     const [theme, setTheme] = useState(localStorage.getItem("theme") ?? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light"));
     const [locale, setLocale] = useState(localStorage.getItem("locale") ?? navigator.language.slice(0, 2) ?? "en");
-    const [alpacaConnection, setAlpacaConnection] = useState(localStorage.getItem("alpaca-connection") ?? "DISCONNECTED");
+    const defaultAlpacaConnection = localStorage.getItem("alpaca-connection") ?? "DISCONNECTED";
+    const [alpacaConnection, setAlpacaConnection] = useState(defaultAlpacaConnection === "CONNECTING" ? "DISCONNECTED" : defaultAlpacaConnection);
+    const [alpacaAccount, setAlpacaAccount] = useState(JSON.parse(localStorage.getItem("alpaca-account") ?? "null"));
 
     useEffect(() => {
       localStorage.setItem("theme", theme);
@@ -147,16 +183,17 @@
     }, [theme]);
     useEffect(() => localStorage.setItem("locale", locale), [locale]);
     useEffect(() => localStorage.setItem("alpaca-connection", alpacaConnection), [alpacaConnection]);
+    useEffect(() => localStorage.setItem("alpaca-account", JSON.stringify(alpacaAccount)), [alpacaAccount]);
 
     const T = key => TRANSLATIONS[locale in TRANSLATIONS ? locale : "en"][key];
     const C = amount => new Intl.NumberFormat(locale, { style: "currency", currency: T("default-currency")}).format(amount);
 
     return (
       <>
-      <Theme T={T} theme={theme} setTheme={setTheme} />
-      <Locale T={T} locale={locale} setLocale={setLocale} />
-      <AlpacaLogin T={T} alpacaConnection={alpacaConnection} setAlpacaConnection={setAlpacaConnection} />
-      {alpacaConnection === "CONNECTED" && <AlpacaAccount T={T} C={C} />}
+        <Theme T={T} theme={theme} setTheme={setTheme} />
+        <Locale T={T} locale={locale} setLocale={setLocale} />
+        <AlpacaLogin T={T} alpacaConnection={alpacaConnection} setAlpacaConnection={setAlpacaConnection} setAlpacaAccount={setAlpacaAccount} />
+        {alpacaConnection === "CONNECTED" && <AlpacaAccount T={T} C={C} alpacaAccount={alpacaAccount} />}
       </>
     );
   }
