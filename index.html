@@ -10,140 +10,158 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
   <link rel="manifest" href="/favicon/site.webmanifest" />
   <style>
+    :root {
+      --theme-color: #f1f2f3;
+      --text-color: #000000;
+    }
+    body[data-theme="dark"] {
+      --theme-color: #494d50;
+      --text-color: #FFFFFF;
+    }
     html, body {
-      height: 100%;
-      font-family: sans-serif;
-      font-weight: 100;
+      margin: 0;
     }
     body {
-      color: #FFFFFF;
-      background-color: #333333;
-    }
-    .centered {
-      display: flex;
-      justify-content: center;
+      background: var(--theme-color);
+      color: var(--text-color)
     }
   </style>
 </head>
 <body>
-  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script type="text/babel" data-type="module" data-presets="typescript,react,flow">
-    import React from "https://esm.sh/react?dev";
-    import ReactDOM from "https://esm.sh/react-dom/client?dev";
-    const { useState, useRef, useEffect } = React;
-
+  <script>
     const TRANSLATIONS = {
       "en": {
-        "title": "Stonkla",
-        "connect": "Connect",
-        "disconnect": "Disconnect",
-        "api-key": "API Key",
-        "api-secret": "API Secret",
-        "locale": "Locale",
-        "current-locale": flag => `Locale: ${flag}`,
+        "alpaca-api-key-label": "API Key:",
+        "alpaca-api-key-placeholder": "API Key",
+        "alpaca-api-secret-label": "API Secret:",
+        "alpaca-api-secret-placeholder": "API Secret",
+        "alpaca-api-connect-button": "Connect",
+        "alpaca-api-disconnect-button": "Disconnect",
+        "alpaca-buying-power-label": "Buying Power:",
+        "dark-mode-label": "Dark",
+        "light-mode-label": "Light",
+        "default-currency": "USD",
         "flag": "🇺🇸",
-        "account-buying-power": amount => `Buying Power: ${amount}`,
-        "currency": "USD",
       },
       "fr": {
-        "title": "Stonkla",
-        "connect": "Connecter",
-        "disconnect": "Déconnecter",
-        "api-key": "Clé API",
-        "api-secret": "API secrète",
-        "locale": "Lieu",
-        "current-locale": flag => `Lieu: ${flag}`,
+        "alpaca-api-key-label": "Clé API:",
+        "alpaca-api-key-placeholder": "Clé API",
+        "alpaca-api-secret-label": "API secrète:",
+        "alpaca-api-secret-placeholder": "API secrète",
+        "alpaca-api-connect-button": "Connecter",
+        "alpaca-api-disconnect-button": "Déconnecter",
+        "alpaca-buying-power-label": "Pouvoir d'achat:",
+        "dark-mode-label": "Sombre",
+        "light-mode-label": "Lumière",
+        "default-currency": "EUR",
         "flag": "🇫🇷",
-        "account-buying-power": amount => `Pouvoir d'achat: ${amount}`,
-        "currency": "EUR",
       },
     };
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" data-type="module" data-presets="typescript,react">
+  import React from "https://esm.sh/react/?dev";
+  import ReactDOMClient from "https://esm.sh/react-dom/client?dev";
+  const { useState, useEffect } = React;
 
-    const ConnectionState = {
-      DISCONNECTED: 0,
-      FAILED: 1,
-      CONNECTING: 2,
-      CONNECTED: 3,
-    };
+  function Theme({ T, theme, setTheme }) {
+    return (
+      <div>
+        <label>
+          {T("dark-mode-label")}
+          <input type="radio" name="theme" onChange={() => setTheme("dark")} checked={theme === "dark"} />
+        </label>
+        <label>
+          {T("light-mode-label")}
+          <input type="radio" name="theme" onChange={() => setTheme("light")} checked={theme === "light"} />
+        </label>
+      </div>
+    );
+  }
 
-    function Locale({ T, locale, setLocale }) {
-      return (
-        <div className="centered">
-          <span onClick={e => setLocale("en")}>{TRANSLATIONS["en"]["flag"]}</span>
-          <span onClick={e => setLocale("fr")}>{TRANSLATIONS["fr"]["flag"]}</span>
-          {T("current-locale")(T("flag"))}
-        </div>
-      );
+  function Locale({ T, locale, setLocale }) {
+    return (
+      <div>
+        <label>
+          {TRANSLATIONS["en"]["flag"]}
+          <input type="radio" name="locale" onChange={() => setLocale("en")} checked={locale === "en"} />
+        </label>
+        <label>
+          {TRANSLATIONS["fr"]["flag"]}
+          <input type="radio" name="locale" onChange={() => setLocale("fr")} checked={locale === "fr"} />
+        </label>
+      </div>
+    );
+  }
+
+  function AlpacaLogin({ T, alpacaConnection, setAlpacaConnection }) {
+    const [alpacaApiKey, setAlpacaApiKey] = useState(localStorage.getItem("alpaca-api-key") ?? "");
+
+    useEffect(() => localStorage.setItem("alpaca-api-key", alpacaApiKey), [alpacaApiKey]);
+
+    function handleConnect(e) {
+      e.preventDefault();
+      setAlpacaConnection("CONNECTING");
+      setAlpacaConnection("CONNECTED");
     }
 
-    function AlpacaConnection({ T, locale, connection, setConnection }) {
-      const [apiKey, setApiKey] = useState(localStorage.getItem("api-key") || "");
-      const [apiSecret, setApiSecret] = useState("");
-
-      useEffect(() => localStorage.setItem("api-key", apiKey), [apiKey]);
-
-      function handleConnect(e) {
-        e.preventDefault();
-        if (e.target.parentNode.reportValidity()) {
-          if (connection <= ConnectionState.FAILED) {
-            setConnection(ConnectionState.CONNECTED);
-          }
-        }
-      }
-
-      function handleDisconnect() {
-        console.assert(connection === ConnectionState.CONNECTED);
-        setConnection(ConnectionState.DISCONNECTED);
-      }
-
-      return (
-        <div className="centered">
-          {connection !== ConnectionState.CONNECTED ?
-            <form>
-              <label>
-                {T("api-key")}
-                <input type="text" required placeholder={T("api-key")} value={apiKey} onChange={e => setApiKey(e.target.value)} />
-              </label>
-              <label>
-                {T("api-secret")}
-                <input type="password" required placeholder={T("api-secret")} value={apiSecret} onChange={e => setApiSecret(e.target.value)} />
-              </label>
-              <button onClick={handleConnect}>{T("connect")}</button>
-            </form> :
-            <button onClick={handleDisconnect}>{T("disconnect")}</button>
-          }
-        </div>
-      );
+    function handleDisconnect() {
+      setAlpacaConnection("DISCONNECTED");
     }
 
-    function AlpacaAccount({ T, locale, connection }) {
-      const C = amount => new Intl.NumberFormat(locale, { style: "currency", currency: T("currency") }).format(amount);
-      return (
-        <div className="centered">
-          {T("account-buying-power")(C(100.28))}
-        </div>
-      );
-    }
+    return alpacaConnection !== "CONNECTED" ? (
+      <form onSubmit={handleConnect}>
+        <label>
+          {T("alpaca-api-key-label")}
+          <input type="text" placeholder={T("alpaca-api-key-placeholder")} value={alpacaApiKey} onChange={e => setAlpacaApiKey(e.target.value)} required />
+        </label>
+        <label>
+          {T("alpaca-api-secret-label")}
+          <input type="password" placeholder={T("alpaca-api-secret-placeholder")} required />
+        </label>
+        <button disabled={alpacaConnection !== "DISCONNECTED"}>{T("alpaca-api-connect-button")}</button>
+      </form>
+    ) : (
+      <div>
+        <button onClick={handleDisconnect}>{T("alpaca-api-disconnect-button")}</button>
+      </div>
+    );
+  }
 
-    function App() {
-      const [locale, setLocale] = useState(localStorage.getItem("locale") || navigator.language.slice(0, 2));
-      const [connection, setConnection] = useState(ConnectionState.DISCONNECTED);
+  function AlpacaAccount({ T, C }) {
+    return (
+      <div>
+      {T("alpaca-buying-power-label") + " " + C(100.00)}
+      </div>
+    );
+  }
 
-      const T = key => TRANSLATIONS[locale][key];
+  function App() {
+    const [theme, setTheme] = useState(localStorage.getItem("theme") ?? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light"));
+    const [locale, setLocale] = useState(localStorage.getItem("locale") ?? navigator.language.slice(0, 2) ?? "en");
+    const [alpacaConnection, setAlpacaConnection] = useState(localStorage.getItem("alpaca-connection") ?? "DISCONNECTED");
 
-      useEffect(() => localStorage.setItem("locale", locale), [locale]);
+    useEffect(() => {
+      localStorage.setItem("theme", theme);
+      document.body.setAttribute("data-theme", theme);
+    }, [theme]);
+    useEffect(() => localStorage.setItem("locale", locale), [locale]);
+    useEffect(() => localStorage.setItem("alpaca-connection", alpacaConnection), [alpacaConnection]);
 
-      return (
-        <>
-          <title>{T("title")}</title>
-          <Locale T={T} locale={locale} setLocale={setLocale} />
-          <AlpacaConnection T={T} locale={locale} connection={connection} setConnection={setConnection} />
-          {connection === ConnectionState.CONNECTED && <AlpacaAccount T={T} locale={locale} connection={connection} />}
-        </>
-      );
-    }
+    const T = key => TRANSLATIONS[locale in TRANSLATIONS ? locale : "en"][key];
+    const C = amount => new Intl.NumberFormat(locale, { style: "currency", currency: T("default-currency")}).format(amount);
 
-    ReactDOM.createRoot(document.body).render(<App />)
+    return (
+      <>
+      <Theme T={T} theme={theme} setTheme={setTheme} />
+      <Locale T={T} locale={locale} setLocale={setLocale} />
+      <AlpacaLogin T={T} alpacaConnection={alpacaConnection} setAlpacaConnection={setAlpacaConnection} />
+      {alpacaConnection === "CONNECTED" && <AlpacaAccount T={T} C={C} />}
+      </>
+    );
+  }
+
+  ReactDOMClient.createRoot(document.body).render(<App />);
   </script>
 </body>
 </html>
